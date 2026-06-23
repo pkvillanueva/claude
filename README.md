@@ -1,4 +1,4 @@
-# personal-setup
+# pkvillanueva-setup
 
 Patrick's personal Claude Code plugin. Home for all reusable Claude Code setup —
 starting with default coding **rules**, with room to grow into skills, agents,
@@ -20,10 +20,10 @@ matching file. **Plugins cannot register rules natively yet**
 so this plugin bridges the gap:
 
 - On every session start, `hooks/sync-rules.sh` copies `rules/*.md` into the
-  project at `.claude/rules/personal-setup/`.
+  project at `.claude/rules/pkvillanueva-setup/`.
 - The native rules engine then loads them with full path-glob scoping.
 
-The copy is namespaced under `personal-setup/` so it never collides with a
+The copy is namespaced under `pkvillanueva-setup/` so it never collides with a
 project's own hand-written rules. Files are overwritten each session so plugin
 updates propagate automatically.
 
@@ -55,7 +55,7 @@ exactly why this plugin syncs into the **project** instead.
 
 ```bash
 /plugin marketplace add pkvillanueva/claude
-/plugin install personal-setup@claude
+/plugin install pkvillanueva-setup@claude
 ```
 
 Pin a version/branch/tag: `pkvillanueva/claude#v1.0`.
@@ -64,7 +64,7 @@ Non-interactive terminal form:
 
 ```bash
 claude plugin marketplace add pkvillanueva/claude
-claude plugin install personal-setup@claude --scope user
+claude plugin install pkvillanueva-setup@claude --scope user
 ```
 
 **Auto-install for a project** — commit this to a repo's `.claude/settings.json`
@@ -75,7 +75,7 @@ and teammates get prompted to install on trust:
   "extraKnownMarketplaces": {
     "claude": { "source": { "source": "github", "repo": "pkvillanueva/claude" } }
   },
-  "enabledPlugins": ["personal-setup@claude"]
+  "enabledPlugins": ["pkvillanueva-setup@claude"]
 }
 ```
 
@@ -83,7 +83,7 @@ and teammates get prompted to install on trust:
 
 ```bash
 /plugin marketplace add /Users/patrickvillanueva/Documents/Personal/claude
-/plugin install personal-setup@claude
+/plugin install pkvillanueva-setup@claude
 ```
 
 ## Ignore synced rules in your projects (optional)
@@ -91,7 +91,7 @@ and teammates get prompted to install on trust:
 The synced files are plugin-managed. To keep them out of a project's git:
 
 ```gitignore
-.claude/rules/personal-setup/
+.claude/rules/pkvillanueva-setup/
 ```
 
 ## Adding more setup later

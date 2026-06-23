@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SRC="${CLAUDE_PLUGIN_ROOT}/rules"
-DEST="${CLAUDE_PROJECT_DIR:-$PWD}/.claude/rules/personal-setup"
+DEST="${CLAUDE_PROJECT_DIR:-$PWD}/.claude/rules/pkvillanueva-setup"
 
 # Nothing to sync if the plugin ships no rules.
 [ -d "$SRC" ] || exit 0
