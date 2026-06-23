@@ -13,6 +13,7 @@
     "frontend-design",
     "stripe",
     "neon",
-    "supabase"
+    "supabase",
+    "playwright"
   ]
 }

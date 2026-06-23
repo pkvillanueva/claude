@@ -73,6 +73,16 @@
         "url": "https://github.com/supabase-community/supabase-plugin.git"
       },
       "description": "Supabase MCP: database, auth, storage, realtime."
+    },
+    {
+      "name": "playwright",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "external_plugins/playwright",
+        "ref": "main"
+      },
+      "description": "Browser automation + E2E testing MCP (Microsoft). Screenshots, form fill, click, navigate."
     }
   ]
 }
