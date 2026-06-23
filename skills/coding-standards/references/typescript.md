@@ -1,9 +1,3 @@
----
-paths:
-  - "**/*.ts"
-  - "**/*.tsx"
----
-
 # TypeScript
 
 ## Types

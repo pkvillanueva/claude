@@ -1,8 +1,3 @@
----
-paths:
-  - "apps/web/**/*"
----
-
 # Next.js App Router
 
 ## Special Files

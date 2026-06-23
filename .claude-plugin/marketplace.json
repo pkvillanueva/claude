@@ -6,9 +6,9 @@
   },
   "plugins": [
     {
-      "name": "pkvillanueva-setup",
+      "name": "pkvillanueva",
       "source": "./",
-      "description": "Default coding rules + home for future Claude Code setup. Bundles caveman + superpowers via dependencies."
+      "description": "Coding-standards skill + home for future Claude Code setup. Bundles caveman + superpowers via dependencies."
     },
     {
       "name": "caveman",

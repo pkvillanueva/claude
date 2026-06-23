@@ -1,8 +1,3 @@
----
-paths:
-  - "**/*.tsx"
----
-
 # React 19+
 
 ## APIs
