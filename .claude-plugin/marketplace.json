@@ -1,0 +1,14 @@
+{
+  "name": "claude",
+  "owner": {
+    "name": "Patrick Villanueva",
+    "email": "pkrvillanueva@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "personal-setup",
+      "source": "./",
+      "description": "Default coding rules + home for future Claude Code setup."
+    }
+  ]
+}
