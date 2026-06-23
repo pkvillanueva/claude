@@ -7,9 +7,13 @@
 - Prefer `satisfies` over assertions
 
 ## Naming
+- Files/folders: `kebab-case` (`user-profile.ts`, `auth-service/`)
 - Functions: verb+noun (`getUserById`, `validateEmail`)
 - Booleans: `is`/`has`/`should`/`can` prefix
 - Constants: `SCREAMING_SNAKE_CASE`
+
+## Imports
+- Prefer direct imports over barrel files: `@/components/ui/button` not `@/components`
 
 ## TSDoc
 Document: public APIs, exported functions, complex logic. Skip self-explanatory code.

@@ -1,6 +1,6 @@
 ---
 name: coding-standards
-description: Use when writing or editing TypeScript, React, Next.js, or Markdown files — Patrick's default coding conventions for type safety, component design, App Router patterns, and table formatting.
+description: Use when writing or editing any code, or TypeScript, React, Next.js, or Markdown files — Patrick's default coding conventions for engineering principles, type safety, component design, App Router patterns, and table formatting.
 ---
 
 # Coding Standards
@@ -15,6 +15,7 @@ Invoke when editing or creating files of these kinds:
 
 | Touching | Read |
 | ----------------------------- | --------------------------------- |
+| Any code file | [references/general.md](references/general.md) |
 | `.ts` / `.tsx` types & logic | [references/typescript.md](references/typescript.md) |
 | `.tsx` React components | [references/react.md](references/react.md) |
 | Next.js App Router (`apps/web/**`) | [references/nextjs.md](references/nextjs.md) |
@@ -24,6 +25,7 @@ Editing a `.tsx` React component in a Next.js app touches all four — read each
 
 ## Quick Reference
 
+- **General** — SOLID/DRY/KISS/YAGNI/TDD, search before creating, 3 usages before abstracting, kebab-case files, comments explain "why", never log secrets.
 - **TypeScript** — `strict`, never `any` (use `unknown`), `type` for data / `interface` for contracts, `satisfies` over assertions, Zod for runtime validation. tRPC via `@trpc/tanstack-react-query`.
 - **React 19+** — Server Components by default, `"use client"` only when needed, named exports, React Compiler handles memoization, semantic HTML + a11y.
 - **Next.js** — App Router special files, explicit `cache` opt-in, always revalidate after mutations, `await params`/`searchParams`, every page has `title` + `description`.

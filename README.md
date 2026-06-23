@@ -45,6 +45,7 @@ Markdown files, then loads only the relevant reference:
 skills/coding-standards/
   SKILL.md                # overview + when-to-use routing table
   references/
+    general.md            # SOLID/DRY/KISS/YAGNI/TDD, naming, comments, security
     typescript.md         # strict types, error handling, tRPC + TanStack Query
     react.md              # React 19+ APIs, state, components, a11y
     nextjs.md             # App Router special files, caching, rendering
