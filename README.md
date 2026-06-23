@@ -6,10 +6,35 @@ hooks, and slash commands.
 
 ## What it ships today
 
-| Component | What                                                                 |
-| --------- | -------------------------------------------------------------------- |
-| `rules/`  | Default coding rules (markdown, TypeScript, React 19+, Next.js)      |
-| `hooks/`  | `SessionStart` hook that syncs rules into each project               |
+| Component      | What                                                            |
+| -------------- | --------------------------------------------------------------- |
+| `rules/`       | Default coding rules (markdown, TypeScript, React 19+, Next.js) |
+| `hooks/`       | `SessionStart` hook that syncs rules into each project          |
+| `dependencies` | Auto-installs caveman + superpowers when this plugin installs   |
+
+## Bundled plugins (one install, everything)
+
+The whole point: add **one** marketplace on a new device, install **one**
+plugin, get the entire setup. Installing `pkvillanueva-setup` auto-installs its
+dependencies via Claude Code's native plugin dependency resolution
+([docs](https://code.claude.com/docs/en/plugin-dependencies)):
+
+| Bundled plugin    | Source                                              |
+| ----------------- | --------------------------------------------------- |
+| `caveman`         | `JuliusBrussee/caveman`                             |
+| `superpowers`     | `obra/superpowers`                                  |
+| `context7`        | `anthropics/claude-plugins-official` (subdir)       |
+| `frontend-design` | `anthropics/claude-plugins-official` (subdir)       |
+| `stripe`          | `stripe/ai` (subdir)                                |
+| `neon`            | `neondatabase/agent-skills` (subdir)                |
+| `supabase`        | `supabase-community/supabase-plugin`                |
+
+All are listed in this repo's `marketplace.json`, so the bare-name
+`dependencies` in `plugin.json` resolve within the same marketplace — no
+cross-marketplace config needed.
+
+To add another plugin to the bundle later: list its real source in
+`marketplace.json`, then add its name to `dependencies` in `plugin.json`.
 
 ## How rules work
 

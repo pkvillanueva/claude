@@ -8,7 +8,71 @@
     {
       "name": "pkvillanueva-setup",
       "source": "./",
-      "description": "Default coding rules + home for future Claude Code setup."
+      "description": "Default coding rules + home for future Claude Code setup. Bundles caveman + superpowers via dependencies."
+    },
+    {
+      "name": "caveman",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/JuliusBrussee/caveman.git"
+      },
+      "description": "Ultra-compressed communication mode. Cuts ~75% tokens, keeps full technical accuracy."
+    },
+    {
+      "name": "superpowers",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/obra/superpowers.git"
+      },
+      "description": "Core skills library: TDD, debugging, collaboration patterns, proven techniques."
+    },
+    {
+      "name": "context7",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "external_plugins/context7",
+        "ref": "main"
+      },
+      "description": "Up-to-date library/framework docs via Context7 MCP."
+    },
+    {
+      "name": "frontend-design",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anthropics/claude-plugins-official.git",
+        "path": "plugins/frontend-design",
+        "ref": "main"
+      },
+      "description": "Distinctive, intentional frontend visual design guidance."
+    },
+    {
+      "name": "stripe",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/stripe/ai.git",
+        "path": "providers/claude/plugin",
+        "ref": "main"
+      },
+      "description": "Stripe integration: payments, Connect, billing, best practices."
+    },
+    {
+      "name": "neon",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/neondatabase/agent-skills.git",
+        "path": "plugins/neon-postgres",
+        "ref": "main"
+      },
+      "description": "Neon Postgres management via MCP."
+    },
+    {
+      "name": "supabase",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/supabase-community/supabase-plugin.git"
+      },
+      "description": "Supabase MCP: database, auth, storage, realtime."
     }
   ]
 }
