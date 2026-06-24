@@ -35,8 +35,8 @@ Attribution + sources: [skills/coding-standards/references/CREDITS.md](skills/co
 
 ## Work log
 
-Two model-invoked skills, no hook: `work-log` writes the log, `work-history`
-reads it back.
+Two model-invoked skills plus a Stop hook: `work-log` writes the log,
+`work-history` reads it back, and `worklog-capture` is the automatic safety net.
 
 - **Write:** automated and agent-decided — after finishing a substantive unit of
   work, Claude self-invokes the `work-log` skill, judges whether it's worth
@@ -50,12 +50,19 @@ reads it back.
   the end of a turn, if substantive work happened (`Edit`/`Write`/`NotebookEdit`)
   and the `work-log` skill wasn't already invoked, it summarizes the session on
   **Haiku 4.5** and appends the line **itself** — no agent turn, no message, no
-  interruption. Fires at most once per session. (It writes the log directly
-  rather than nudging the agent, because a Stop hook can only prompt the agent by
-  *blocking* the stop, which Claude Code renders as an alarming "Stop hook error".)
+  interruption. It tracks a per-session offset into the transcript, so each new
+  unit of work gets its own line (a follow-up task isn't swallowed by the first).
+  (It writes the log directly rather than nudging the agent, because a Stop hook
+  can only prompt the agent by *blocking* the stop, which Claude Code renders as
+  an alarming "Stop hook error".)
 - **Query:** ask *"what did I do today / this week / this past month"* (optionally
   on a project) and the `work-history` skill runs `scripts/query.js` and narrates
   the result — also on **Haiku 4.5** via a headless call, keeping reads cheap too.
+
+All three need the `claude` CLI on the path. The hook resolves it from common
+install locations (`~/.local/bin`, Homebrew, `/usr/local/bin`) so it still works
+under the stripped PATH a Stop-hook subprocess gets; set `CLAUDE_WORKLOG_BIN` to
+override the location explicitly.
 
 ```md
 # Work Log — 2026-06-24
