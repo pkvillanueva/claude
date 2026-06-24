@@ -2,14 +2,28 @@
 "use strict";
 
 /**
- * SessionEnd hook: append a short AI summary of the just-ended session to a
- * per-day work log at ~/.claude/work-log/<YYYY-MM-DD>.md.
+ * TaskCompleted hook: append a line to a per-day work log at
+ * ~/.claude/work-log/<YYYY-MM-DD>.md every time a task is marked complete.
  *
- * A hook command cannot call an LLM directly (the prompt/agent hook types only
- * work for tool events), so we shell out to a headless `claude -p`. That nested
- * call would itself fire SessionEnd, so we guard against recursion with an env
- * var. The whole thing is best-effort: it must never block the user from
- * quitting, so every failure path still exits 0.
+ * Why TaskCompleted instead of SessionEnd: SessionEnd only fires on a *clean*
+ * exit, so a crash / `kill -9` / closed terminal loses the log entirely, and it
+ * also false-fires on `/clear`. TaskCompleted fires synchronously the moment a
+ * unit of work finishes, mid-session, so completed work is captured no matter
+ * how the session later dies.
+ *
+ * Granularity: one log line per completed task. The task's own description is
+ * the summary when the payload carries it (instant, no LLM); otherwise we fall
+ * back to a cheap `claude -p` summary of the recent transcript tail. That
+ * nested call would itself complete tasks in its own session, so we guard
+ * against recursion with an env var.
+ *
+ * CRITICAL: TaskCompleted blocks the task from being marked complete on exit 2.
+ * This hook is best-effort logging — it MUST NEVER exit non-zero. Every path
+ * exits 0.
+ *
+ * Self-correcting: TaskCompleted's task-specific payload fields are undocumented,
+ * so each fire appends its raw payload to .task-payloads.jsonl (capped) until we
+ * confirm the real field names from live data and can tighten extraction.
  */
 
 const fs = require("fs");
@@ -17,42 +31,66 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-// Recursion guard: the nested `claude -p` we spawn below sets this var, so its
-// own SessionEnd becomes a no-op. Must be the very first thing we do.
+// Recursion guard: the nested `claude -p` we may spawn sets this var, so any
+// TaskCompleted it triggers becomes a no-op. Must be the very first thing we do.
 if (process.env.CLAUDE_WORKLOG_ACTIVE) process.exit(0);
 
 const WORKLOG_DIR = path.join(os.homedir(), ".claude", "work-log");
-const SESSIONS_FILE = path.join(WORKLOG_DIR, ".logged-sessions");
+const LOGGED_FILE = path.join(WORKLOG_DIR, ".logged-tasks");
+const PAYLOAD_DEBUG_FILE = path.join(WORKLOG_DIR, ".task-payloads.jsonl");
 const MODEL = "claude-haiku-4-5";
 
-// Keep the digest small so the summarizer call stays cheap and fast.
+// Cap the payload-capture file so it can't grow without bound. Once we've seen
+// enough real payloads to confirm the schema, this capture can be removed.
+const MAX_DEBUG_PAYLOADS = 50;
+
+// Keep the digest small so the fallback summarizer call stays cheap and fast.
 const MAX_DIGEST_CHARS = 6000;
 const MAX_MESSAGE_CHARS = 1000;
-const MIN_DIGEST_CHARS = 120; // below this the session is too thin to summarize
+const MIN_DIGEST_CHARS = 120; // below this the tail is too thin to summarize
+
+// Common fields present on every hook payload — never the task description.
+const COMMON_FIELDS = new Set([
+  "session_id",
+  "transcript_path",
+  "cwd",
+  "permission_mode",
+  "hook_event_name",
+  "agent_id",
+  "agent_type",
+]);
 
 function main() {
   try {
     const input = JSON.parse(readStdin() || "{}");
-    const transcriptPath = input.transcript_path;
-    const sessionId = input.session_id || "";
+    capturePayload(input); // best-effort schema discovery; never throws fatally
+
     const project = input.cwd ? path.basename(input.cwd) : "unknown";
+    const transcriptPath = input.transcript_path;
 
-    if (!transcriptPath || !fs.existsSync(transcriptPath)) process.exit(0);
-    if (sessionId && alreadyLogged(sessionId)) process.exit(0);
+    // The task description is the ideal log line — instant, no LLM. Field name
+    // is undocumented, so pull the best human-readable string from the payload.
+    let summary = extractTaskDescription(input);
 
-    const messages = readTranscript(transcriptPath);
-    const digest = buildDigest(messages);
-    if (digest.length < MIN_DIGEST_CHARS) {
-      markLogged(sessionId); // thin session — record so we never retry it
-      process.exit(0);
+    // Fall back to summarizing the recent transcript tail only if the payload
+    // gave us nothing usable.
+    if (!summary && transcriptPath && fs.existsSync(transcriptPath)) {
+      const messages = readTranscript(transcriptPath);
+      const digest = buildDigest(messages);
+      if (digest.length >= MIN_DIGEST_CHARS) {
+        summary = summarize(digest) || fallbackSummary(messages);
+      }
     }
 
-    const summary = summarize(digest) || fallbackSummary(messages);
-    if (summary) appendEntry(summary, project);
+    if (!summary) process.exit(0); // nothing worth logging
 
-    markLogged(sessionId);
+    const key = dedupeKey(input.session_id || "", summary);
+    if (alreadyLogged(key)) process.exit(0);
+
+    appendEntry(summary, project);
+    markLogged(key);
   } catch {
-    // Best-effort logging must never interrupt session shutdown.
+    // Best-effort logging must never block a task from completing.
   }
   process.exit(0);
 }
@@ -63,6 +101,62 @@ function readStdin() {
   } catch {
     return "";
   }
+}
+
+// Append the raw payload to a capped debug file so we can confirm the real
+// TaskCompleted schema from live data, then tighten extractTaskDescription.
+function capturePayload(input) {
+  try {
+    fs.mkdirSync(WORKLOG_DIR, { recursive: true });
+    let count = 0;
+    if (fs.existsSync(PAYLOAD_DEBUG_FILE)) {
+      count = fs.readFileSync(PAYLOAD_DEBUG_FILE, "utf8").split("\n").filter(Boolean).length;
+    }
+    if (count < MAX_DEBUG_PAYLOADS) {
+      fs.appendFileSync(PAYLOAD_DEBUG_FILE, JSON.stringify(input) + "\n");
+    }
+  } catch {
+    // capture is purely diagnostic — ignore any failure
+  }
+}
+
+/**
+ * The task description lives under an undocumented key. Heuristic: scan the
+ * payload's own (non-common) string fields and pick the most descriptive one —
+ * the longest plain-prose string that isn't a path, id, or status token. Returns
+ * "" if nothing looks like a description, so the caller falls back to the LLM.
+ */
+function extractTaskDescription(input) {
+  let best = "";
+  for (const [k, v] of Object.entries(input)) {
+    if (COMMON_FIELDS.has(k)) continue;
+    const candidate = pickString(v);
+    if (!candidate) continue;
+    if (looksLikeNoise(candidate)) continue;
+    if (candidate.length > best.length) best = candidate;
+  }
+  return best ? toOneLine(clean(best)) : "";
+}
+
+// Pull a usable string out of a value that may be a string or a shallow object
+// (e.g. { description } / { text } / { content }).
+function pickString(v) {
+  if (typeof v === "string") return v.trim();
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    for (const key of ["description", "text", "content", "prompt", "title", "summary"]) {
+      if (typeof v[key] === "string" && v[key].trim()) return v[key].trim();
+    }
+  }
+  return "";
+}
+
+// Reject values that are clearly not a human task description.
+function looksLikeNoise(s) {
+  if (s.length < 8) return true; // too short to be a description
+  if (/^[0-9a-f-]{8,}$/i.test(s)) return true; // uuid / hash / id
+  if (/^(\/|~|[a-z]:\\)/i.test(s)) return true; // filesystem path
+  if (/^(completed|pending|in_progress|success|failed|done)$/i.test(s)) return true; // status
+  return false;
 }
 
 /**
@@ -120,27 +214,25 @@ function buildDigest(messages) {
 // System prompt fully replaces the default one so the summarizer is NOT
 // influenced by the project's CLAUDE.md, caveman mode, or other plugins.
 const SUMMARY_SYSTEM_PROMPT =
-  "You summarize completed Claude Code sessions for a work log. Reply ONLY with " +
-  "1-2 terse past-tense bullet points (no leading dash, no preamble, no questions, " +
-  "no markdown headers) describing what was accomplished. If the session has no " +
-  "substantive work (only trivial questions or lookups), reply with exactly: NONE. " +
-  "The session is already over — never ask questions or offer to do anything.";
+  "You summarize a just-completed unit of work from a Claude Code session for a " +
+  "work log. Reply ONLY with one terse past-tense line (no leading dash, no " +
+  "preamble, no questions, no markdown) describing what was accomplished. If the " +
+  "work was trivial (only a lookup or trivial question), reply with exactly: NONE. " +
+  "The work is already done — never ask questions or offer to do anything.";
 
 /**
- * Ask a cheap model to condense the session into 1-2 bullets, or "NONE" if the
- * work was trivial. Returns a single-line summary, or "" to skip.
+ * Fallback only: ask a cheap model to condense the recent transcript tail into
+ * one line, or "NONE" if trivial. Returns a single-line summary, or "" to skip.
  *
- * The call is isolated so it summarizes instead of trying to *do* the work:
  *   --strict-mcp-config        no MCP servers (fast, no auth prompts)
  *   --no-session-persistence   don't write throwaway session files
  *   --system-prompt            replace the default prompt (drops CLAUDE.md/caveman)
  *   cwd: tmpdir                no project CLAUDE.md picked up
- * The digest is wrapped as past-tense data so the model treats it as a record.
  */
 function summarize(digest) {
   const userMessage =
-    "Summarize this completed, already-finished session. Do NOT perform any task " +
-    "or ask questions. Only describe what was accomplished:\n\n" +
+    "Summarize the most recently completed work in this transcript tail. Do NOT " +
+    "perform any task or ask questions. Only describe what was accomplished:\n\n" +
     `<session_transcript>\n${digest}\n</session_transcript>`;
 
   let output;
@@ -175,7 +267,8 @@ function summarize(digest) {
   return oneLine;
 }
 
-// The model may return two bullets (-, *, or •); flatten to one log line.
+// The model (or a multi-line description) may return several lines; flatten to
+// one log line, stripping any bullet markers (-, *, •).
 function toOneLine(text) {
   return text
     .split("\n")
@@ -185,12 +278,18 @@ function toOneLine(text) {
 }
 
 // Used when the summarizer is unavailable: log the last thing the user asked for
-// so the session still leaves a trace.
+// so the work still leaves a trace.
 function fallbackSummary(messages) {
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   if (!lastUser) return "";
   const text = lastUser.text.slice(0, 140);
   return `[unsummarized] ${text}`;
+}
+
+// Stable dedupe key so a re-fired TaskCompleted (or an identical line) logs once.
+function dedupeKey(sessionId, summary) {
+  const normalized = summary.toLowerCase().replace(/\s+/g, " ").trim();
+  return `${sessionId}::${normalized}`;
 }
 
 function appendEntry(summary, project) {
@@ -207,16 +306,16 @@ function appendEntry(summary, project) {
   fs.appendFileSync(file, prefix + line);
 }
 
-function alreadyLogged(sessionId) {
-  if (!fs.existsSync(SESSIONS_FILE)) return false;
-  const seen = fs.readFileSync(SESSIONS_FILE, "utf8").split("\n");
-  return seen.includes(sessionId);
+function alreadyLogged(key) {
+  if (!fs.existsSync(LOGGED_FILE)) return false;
+  const seen = fs.readFileSync(LOGGED_FILE, "utf8").split("\n");
+  return seen.includes(key);
 }
 
-function markLogged(sessionId) {
-  if (!sessionId) return;
+function markLogged(key) {
+  if (!key) return;
   fs.mkdirSync(WORKLOG_DIR, { recursive: true });
-  fs.appendFileSync(SESSIONS_FILE, `${sessionId}\n`);
+  fs.appendFileSync(LOGGED_FILE, `${key}\n`);
 }
 
 function toDateStr(d) {
