@@ -39,6 +39,9 @@ const WORKLOG_DIR = path.join(os.homedir(), ".claude", "work-log");
 // and end in "\n", so a line count drifts by one (the trailing empty element)
 // and would drop the first line of the next appended turn.
 const PROGRESS_FILE = path.join(WORKLOG_DIR, ".session-progress.json");
+// Cap the progress map so it can't grow without bound as sessions accumulate.
+// On overflow we keep the most-recently-written entries (insertion order).
+const MAX_PROGRESS_SESSIONS = 300;
 const MODEL = "claude-haiku-4-5";
 
 // Tool calls that signal real work landed and may be worth logging.
@@ -268,8 +271,14 @@ function readProgress() {
 
 function writeProgress(progress) {
   try {
+    let toWrite = progress;
+    const keys = Object.keys(progress);
+    if (keys.length > MAX_PROGRESS_SESSIONS) {
+      toWrite = {};
+      for (const k of keys.slice(-MAX_PROGRESS_SESSIONS)) toWrite[k] = progress[k];
+    }
     fs.mkdirSync(WORKLOG_DIR, { recursive: true });
-    fs.writeFileSync(PROGRESS_FILE, JSON.stringify(progress));
+    fs.writeFileSync(PROGRESS_FILE, JSON.stringify(toWrite));
   } catch {
     /* best-effort */
   }
