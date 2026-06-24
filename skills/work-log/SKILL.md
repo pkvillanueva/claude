@@ -45,7 +45,7 @@ produce the line.
    ```bash
    d=$(date +%F); t=$(date +%H:%M); f=~/.claude/work-log/$d.md
    mkdir -p ~/.claude/work-log
-   sys="Summarize completed work as ONE terse past-tense line for a work log. Reply with only the line — no leading dash, no markdown, no preamble, no questions."
+   sys="Summarize completed work as ONE terse past-tense line for a work log. Describe only WHAT was done — do NOT name the project, repo, or directory (that's recorded separately, so naming it is redundant). Reply with only the line — no leading dash, no markdown, no preamble, no questions."
    line=$(claude -p --model claude-haiku-4-5 --strict-mcp-config --no-session-persistence \
      --system-prompt "$sys" "<RECAP>" 2>/dev/null | tr -d '\r' | grep -m1 . | sed 's/^[[:space:]]*[-*•][[:space:]]*//')
    [ -z "$line" ] && line="<RECAP>"   # fall back to the recap if Haiku is unavailable
