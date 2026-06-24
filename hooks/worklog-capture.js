@@ -78,6 +78,12 @@ function main() {
 
   appendEntry(summary, project);
   markLogged(sessionId);
+
+  // Non-blocking confirmation. `systemMessage` (no `decision`) surfaces a plain
+  // info line to the user without blocking the stop — so it never renders as a
+  // "Stop hook error". If a Claude Code build doesn't honor systemMessage on Stop
+  // hooks, the JSON is ignored and the capture is simply silent. Either is fine.
+  process.stdout.write(JSON.stringify({ systemMessage: `📝 Work logged — ${summary}` }));
   process.exit(0);
 }
 
