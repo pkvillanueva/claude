@@ -42,8 +42,9 @@ reads it back.
   work, Claude self-invokes the `work-log` skill, judges whether it's worth
   recording, and (if so) appends one timestamped past-tense line to
   `~/.claude/work-log/<YYYY-MM-DD>.md`, tagged with the project. Not a user
-  command; trivial lookups and questions are skipped. Claude writes the line
-  directly — no headless call.
+  command; trivial lookups and questions are skipped. The summary line is
+  generated on **Haiku 4.5** (`claude-haiku-4-5`, the cheapest model) via a
+  headless call, not on the session model — so logging costs almost nothing.
 - **Nudge:** because a self-invoked skill gets dropped once context fills, a thin
   `Stop` hook (`hooks/worklog-reminder.js`) reminds the agent to consider
   `work-log` when a turn ends after real edits and nothing was logged. It carries
@@ -51,7 +52,7 @@ reads it back.
   when `Edit`/`Write`/`NotebookEdit` ran and `work-log` hasn't.
 - **Query:** ask *"what did I do today / this week / this past month"* (optionally
   on a project) and the `work-history` skill runs `scripts/query.js` and narrates
-  it.
+  the result — also on **Haiku 4.5** via a headless call, keeping reads cheap too.
 
 ```md
 # Work Log — 2026-06-24

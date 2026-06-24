@@ -32,9 +32,19 @@ query script.
    node ${CLAUDE_PLUGIN_ROOT}/scripts/query.js --week --project claude
    ```
 
-3. Summarize the returned entries for the user. For a single day, list them. For
-   a week or month, group by day or theme and give a brief rollup — keep it
-   scannable, not a raw dump.
+3. Narrate the returned entries on the **cheapest model** (`claude-haiku-4-5`),
+   not the session model — pipe the script output through a headless Haiku call
+   and relay its answer:
+
+   ```bash
+   sys="You summarize a personal work log for the user. Group by day or theme, keep it scannable (not a raw dump). For a single day, just list the entries. No preamble."
+   node ${CLAUDE_PLUGIN_ROOT}/scripts/query.js --week --project claude \
+     | claude -p --model claude-haiku-4-5 --strict-mcp-config --no-session-persistence \
+         --system-prompt "$sys" 2>/dev/null
+   ```
+
+   If the Haiku call returns nothing (offline / not installed), fall back to
+   summarizing the raw script output yourself.
 
 ## Notes
 
