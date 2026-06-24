@@ -9,7 +9,7 @@ skills, agents, hooks, and slash commands.
 | Component      | What                                                                |
 | -------------- | ------------------------------------------------------------------- |
 | `skills/`      | `coding-standards`, `work-log` (write), `work-history` (query) skills |
-| `hooks/`       | `worklog-reminder` Stop hook — nudges the agent to run `work-log`    |
+| `hooks/`       | `worklog-capture` Stop hook — silently logs the session on Haiku     |
 | `scripts/`     | `query.js` — reads the work log back for the `work-history` skill    |
 | `dependencies` | Auto-installs caveman + superpowers + more when this plugin installs |
 
@@ -45,11 +45,14 @@ reads it back.
   command; trivial lookups and questions are skipped. The summary line is
   generated on **Haiku 4.5** (`claude-haiku-4-5`, the cheapest model) via a
   headless call, not on the session model — so logging costs almost nothing.
-- **Nudge:** because a self-invoked skill gets dropped once context fills, a thin
-  `Stop` hook (`hooks/worklog-reminder.js`) reminds the agent to consider
-  `work-log` when a turn ends after real edits and nothing was logged. It carries
-  no logging logic — just the reminder — and fires at most once per session, only
-  when `Edit`/`Write`/`NotebookEdit` ran and `work-log` hasn't.
+- **Auto-capture (silent):** because a self-invoked skill gets dropped once
+  context fills, a `Stop` hook (`hooks/worklog-capture.js`) is the safety net. At
+  the end of a turn, if substantive work happened (`Edit`/`Write`/`NotebookEdit`)
+  and the `work-log` skill wasn't already invoked, it summarizes the session on
+  **Haiku 4.5** and appends the line **itself** — no agent turn, no message, no
+  interruption. Fires at most once per session. (It writes the log directly
+  rather than nudging the agent, because a Stop hook can only prompt the agent by
+  *blocking* the stop, which Claude Code renders as an alarming "Stop hook error".)
 - **Query:** ask *"what did I do today / this week / this past month"* (optionally
   on a project) and the `work-history` skill runs `scripts/query.js` and narrates
   the result — also on **Haiku 4.5** via a headless call, keeping reads cheap too.
