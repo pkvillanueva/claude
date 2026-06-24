@@ -8,8 +8,28 @@ skills, agents, hooks, and slash commands.
 
 | Component      | What                                                              |
 | -------------- | ---------------------------------------------------------------- |
-| `skills/`      | `coding-standards` skill (Markdown, TypeScript, React 19+, Next.js) |
+| `skills/`      | `coding-standards` skill — core conventions + deep-dive references |
 | `dependencies` | Auto-installs caveman + superpowers + more when this plugin installs |
+
+### coding-standards references
+
+One reference file per domain (progressive disclosure: the `SKILL.md` index loads
+only the file a task touches; each domain file has a section index up top). The
+React, React Native, Next.js, and web-design files fold in material distilled from
+Vercel's open-source agent skills, then **owned** here — rewritten lean, maintained
+in-repo, no upstream sync.
+
+| Reference         | Covers                                                              |
+| ----------------- | ------------------------------------------------------------------ |
+| `general.md`      | engineering principles, naming, comments, security                 |
+| `typescript.md`   | strict types, error handling, tRPC + TanStack Query                |
+| `react.md`        | APIs/state/components + performance, composition, view transitions |
+| `react-native.md` | RN/Expo                                                             |
+| `nextjs.md`       | App Router basics + RSC boundaries, OG images, runtime, self-host  |
+| `web-design.md`   | UX / a11y review checklist                                          |
+| `markdown.md`     | aligned table formatting                                            |
+
+Attribution + sources: [skills/coding-standards/references/CREDITS.md](skills/coding-standards/references/CREDITS.md).
 
 ## Bundled plugins (one install, everything)
 
@@ -43,13 +63,16 @@ Markdown files, then loads only the relevant reference:
 
 ```
 skills/coding-standards/
-  SKILL.md                # overview + when-to-use routing table
+  SKILL.md             # overview + progressive-disclosure routing (one file per domain)
   references/
-    general.md            # SOLID/DRY/KISS/YAGNI/TDD, naming, comments, security
-    typescript.md         # strict types, error handling, tRPC + TanStack Query
-    react.md              # React 19+ APIs, state, components, a11y
-    nextjs.md             # App Router special files, caching, rendering
-    markdown.md           # aligned table formatting
+    general.md         # SOLID/DRY/KISS/YAGNI/TDD, naming, comments, security
+    typescript.md      # strict types, error handling, tRPC + TanStack Query
+    react.md           # APIs/state/components + performance, composition, view transitions
+    react-native.md    # RN/Expo
+    nextjs.md          # App Router basics + RSC boundaries, OG images, runtime, self-host
+    web-design.md      # UX / a11y review checklist
+    markdown.md        # aligned table formatting
+    CREDITS.md         # attribution for distilled material
 ```
 
 Unlike the native `.claude/rules/` engine (which path-scopes by `paths:`
