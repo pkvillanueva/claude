@@ -47,11 +47,19 @@ function isWorklogInvocation(block) {
   return typeof skill === "string" && skill.includes(WORKLOG_SKILL);
 }
 
+// Shown to the agent (and surfaced to the user). Claude Code prefixes blocking
+// Stop-hook output with "Stop hook error:" — a label we can't change from here —
+// so the body leads by saying it's a benign reminder, not a failure.
 const NUDGE =
-  "Substantive edits landed this session but the work-log skill has not recorded " +
-  "them. If this work is worth remembering later, invoke the work-log skill now to " +
-  "log one line. If it was trivial (a lookup, a question, abandoned work), it's fine " +
-  "to stop without logging.";
+  "Reminder, not an error — this is the work-log nudge. Substantive edits landed " +
+  "this session but the work-log skill hasn't recorded them yet. If the work is " +
+  "worth remembering, invoke the work-log skill now to log one line; if it was " +
+  "trivial (a lookup, a question, abandoned work), just stop — nothing is wrong.";
+
+// An explicit next action for the agent to act on while continuing.
+const NUDGE_CONTEXT =
+  "Invoke the pkvillanueva:work-log skill to record this session, then stop. " +
+  "If the work was trivial, stop without logging — both are fine.";
 
 function main() {
   let input;
@@ -80,7 +88,13 @@ function main() {
   // All guards passed — nudge once, record it, and block the stop so the agent
   // gets the reminder in-context.
   markNudged(sessionId);
-  process.stdout.write(JSON.stringify({ decision: "block", reason: NUDGE }));
+  process.stdout.write(
+    JSON.stringify({
+      decision: "block",
+      reason: NUDGE,
+      hookSpecificOutput: { hookEventName: "Stop", additionalContext: NUDGE_CONTEXT },
+    }),
+  );
   process.exit(0);
 }
 
