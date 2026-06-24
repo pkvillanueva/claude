@@ -9,6 +9,7 @@ skills, agents, hooks, and slash commands.
 | Component      | What                                                                |
 | -------------- | ------------------------------------------------------------------- |
 | `skills/`      | `coding-standards`, `work-log` (write), `work-history` (query) skills |
+| `hooks/`       | `worklog-reminder` Stop hook — nudges the agent to run `work-log`    |
 | `scripts/`     | `query.js` — reads the work log back for the `work-history` skill    |
 | `dependencies` | Auto-installs caveman + superpowers + more when this plugin installs |
 
@@ -42,7 +43,12 @@ reads it back.
   recording, and (if so) appends one timestamped past-tense line to
   `~/.claude/work-log/<YYYY-MM-DD>.md`, tagged with the project. Not a user
   command; trivial lookups and questions are skipped. Claude writes the line
-  directly — no headless call, no background hook.
+  directly — no headless call.
+- **Nudge:** because a self-invoked skill gets dropped once context fills, a thin
+  `Stop` hook (`hooks/worklog-reminder.js`) reminds the agent to consider
+  `work-log` when a turn ends after real edits and nothing was logged. It carries
+  no logging logic — just the reminder — and fires at most once per session, only
+  when `Edit`/`Write`/`NotebookEdit` ran and `work-log` hasn't.
 - **Query:** ask *"what did I do today / this week / this past month"* (optionally
   on a project) and the `work-history` skill runs `scripts/query.js` and narrates
   it.
