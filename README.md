@@ -6,9 +6,11 @@ skills, agents, hooks, and slash commands.
 
 ## What it ships today
 
-| Component      | What                                                              |
-| -------------- | ---------------------------------------------------------------- |
-| `skills/`      | `coding-standards` skill — core conventions + deep-dive references |
+| Component      | What                                                                |
+| -------------- | ------------------------------------------------------------------- |
+| `skills/`      | `coding-standards` skill + `worklog` skill (query your work log)     |
+| `hooks/`       | `worklog` SessionEnd hook — auto-logs a summary of each session      |
+| `scripts/`     | `query.js` — reads the work log back for the `worklog` skill         |
 | `dependencies` | Auto-installs caveman + superpowers + more when this plugin installs |
 
 ### coding-standards references
@@ -30,6 +32,28 @@ in-repo, no upstream sync.
 | `markdown.md`     | aligned table formatting                                            |
 
 Attribution + sources: [skills/coding-standards/references/CREDITS.md](skills/coding-standards/references/CREDITS.md).
+
+## Work log
+
+A `SessionEnd` hook (`hooks/worklog.js`) records what you did each session, and a
+`worklog` skill reads it back on demand.
+
+- **Capture:** when a session ends, the hook summarizes it with a cheap, isolated
+  headless `claude -p` call and appends one timestamped line to
+  `~/.claude/work-log/<YYYY-MM-DD>.md`, tagged with the project. Trivial sessions
+  are skipped; failures fall back to logging the last request. It always exits
+  cleanly and never blocks you from quitting.
+- **Query:** ask *"what did I do today / this week / this past month"* (optionally
+  on a project) and the `worklog` skill runs `scripts/query.js` and narrates it.
+
+```md
+# Work Log — 2026-06-24
+
+- **16:42** — Built the worklog hook and verified it fires _(project: claude)_
+```
+
+Logs live in `~/.claude/work-log/` (global, across all projects) and are not
+committed. Needs Node and the `claude` CLI on `PATH`.
 
 ## Bundled plugins (one install, everything)
 
