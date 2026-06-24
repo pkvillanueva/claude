@@ -4,16 +4,22 @@
 /**
  * Stop hook: SILENTLY record substantive work to the daily work log.
  *
- * Why silent self-logging instead of nudging the agent: a Stop hook can only
- * make the agent act by *blocking* the stop, and Claude Code renders any blocking
- * Stop-hook output as "Stop hook error: …" — alarming, and it costs an extra
- * agent turn. So instead of asking the agent to log, this hook does the logging
- * itself: it summarizes the session on the cheapest model (Haiku 4.5) and appends
- * one line to ~/.claude/work-log/<YYYY-MM-DD>.md. No block, no message, no turn.
+ * Why silent self-logging instead of nudging the agent: a Stop hook can only make
+ * the agent act by *blocking* the stop, and Claude Code renders any blocking
+ * Stop-hook output as "Stop hook error: …" — alarming, and it costs an extra agent
+ * turn. So instead of asking the agent to log, this hook does the logging itself:
+ * it summarizes on the cheapest model (Haiku 4.5) and appends one line to
+ * ~/.claude/work-log/<YYYY-MM-DD>.md, then prints a non-blocking confirmation.
+ *
+ * Incremental, not once-per-session: the Stop hook fires at every turn end. We
+ * remember how many transcript lines we've already examined per session and, on
+ * each fire, look only at the NEW lines. So a follow-up unit of work ("now remove
+ * X") gets its own log line instead of being swallowed by a one-shot guard. The
+ * processed pointer always advances, so already-seen work is never re-summarized.
  *
  * The work-log *skill* still exists for explicit/manual logging ("log my work");
- * this hook is the automatic safety net so nothing is lost when the agent doesn't
- * log proactively.
+ * this hook is the automatic safety net. If the agent logged via the skill within
+ * the new slice, the hook skips it to avoid a duplicate.
  *
  * Best-effort: this MUST NOT break a session. Every path exits 0, all IO wrapped.
  */
@@ -28,17 +34,22 @@ const { execFileSync } = require("child_process");
 if (process.env.CLAUDE_WORKLOG_ACTIVE) process.exit(0);
 
 const WORKLOG_DIR = path.join(os.homedir(), ".claude", "work-log");
-const LOGGED_FILE = path.join(WORKLOG_DIR, ".logged-sessions");
+// Per-session progress: { "<session_id>": <transcript chars already examined> }.
+// Tracked as a CHARACTER OFFSET, not a line count — transcripts are append-only
+// and end in "\n", so a line count drifts by one (the trailing empty element)
+// and would drop the first line of the next appended turn.
+const PROGRESS_FILE = path.join(WORKLOG_DIR, ".session-progress.json");
 const MODEL = "claude-haiku-4-5";
 
 // Tool calls that signal real work landed and may be worth logging.
 const WORK_TOOLS = new Set(["Edit", "Write", "NotebookEdit"]);
 const WORKLOG_SKILL = "work-log";
 
-// Digest sizing — keep the summarizer call cheap and fast.
+// Digest sizing — keep the summarizer call cheap and fast. The floor only skips a
+// near-empty slice; a real work turn always clears it.
 const MAX_DIGEST_CHARS = 6000;
 const MAX_MESSAGE_CHARS = 1000;
-const MIN_DIGEST_CHARS = 80;
+const MIN_DIGEST_CHARS = 20;
 
 const SUMMARY_SYSTEM_PROMPT =
   "You summarize a completed Claude Code session for a work log. Reply with ONLY " +
@@ -61,29 +72,43 @@ function main() {
   const transcriptPath = input.transcript_path;
   const project = input.cwd ? path.basename(input.cwd) : "unknown";
 
-  if (sessionId && alreadyLogged(sessionId)) process.exit(0); // once per session
   if (!transcriptPath || !safeExists(transcriptPath)) process.exit(0);
 
-  const messages = readTranscript(transcriptPath);
-  const { didWork, didLog } = scan(messages, transcriptPath);
+  let text;
+  try {
+    text = fs.readFileSync(transcriptPath, "utf8");
+  } catch {
+    process.exit(0);
+  }
 
-  // Nothing substantive, or the agent already logged via the skill → leave it.
-  if (!didWork || didLog) process.exit(0);
+  // Only examine the bytes appended since we last looked at this session.
+  const progress = readProgress();
+  const seen = sessionId ? progress[sessionId] || 0 : 0;
+  if (text.length <= seen) process.exit(0); // nothing new since last fire
 
-  const digest = buildDigest(messages);
-  if (digest.length < MIN_DIGEST_CHARS) process.exit(0);
+  const { didWork, didLog, messages } = scanSlice(text.slice(seen).split("\n"));
 
-  const summary = summarize(digest);
-  if (!summary) process.exit(0); // trivial / summarizer unavailable
+  let summary = "";
+  if (didWork && !didLog) {
+    const digest = buildDigest(messages);
+    if (digest.length >= MIN_DIGEST_CHARS) summary = summarize(digest);
+  }
+  if (summary) appendEntry(summary, project);
 
-  appendEntry(summary, project);
-  markLogged(sessionId);
+  // Advance the pointer past everything we just examined — whether or not we
+  // logged — so this slice is never reconsidered. (If the summarizer was offline,
+  // the slice's work is skipped; that's an acceptable miss for a best-effort net.)
+  if (sessionId) {
+    progress[sessionId] = text.length;
+    writeProgress(progress);
+  }
 
-  // Non-blocking confirmation. `systemMessage` (no `decision`) surfaces a plain
-  // info line to the user without blocking the stop — so it never renders as a
-  // "Stop hook error". If a Claude Code build doesn't honor systemMessage on Stop
-  // hooks, the JSON is ignored and the capture is simply silent. Either is fine.
-  process.stdout.write(JSON.stringify({ systemMessage: `📝 Work logged — ${summary}` }));
+  if (summary) {
+    // Non-blocking confirmation: `systemMessage` (no `decision`) surfaces a plain
+    // info line without blocking the stop, so it never renders as a "Stop hook
+    // error". Ignored harmlessly by builds that don't honor it on Stop hooks.
+    process.stdout.write(JSON.stringify({ systemMessage: `📝 Work logged — ${summary}` }));
+  }
   process.exit(0);
 }
 
@@ -104,80 +129,54 @@ function safeExists(p) {
 }
 
 /**
- * Parse the transcript once: collect human/assistant prose for the digest, and
- * report whether a work tool ran and whether the work-log skill was invoked.
- * `didLog` requires a real `Skill` tool_use naming work-log — NOT a bare
- * substring (the skill's name is injected into every session as an available
- * skill, so a substring match is always true and would suppress all logging).
+ * Single pass over a slice of raw transcript lines. Returns whether a work tool
+ * ran, whether the work-log skill was invoked, and the human/assistant prose for
+ * the digest — thinking, tool calls, attachments, and sidechains excluded.
+ * `didLog` requires a real `Skill` tool_use naming work-log — NOT a substring
+ * match (the skill name is injected into every session as an available skill, so
+ * a substring is always present and would suppress logging).
  */
-function scan(messages, transcriptPath) {
+function scanSlice(lines) {
   let didWork = false;
   let didLog = false;
-  try {
-    for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
-      if (didWork && didLog) break;
-      if (!line.trim()) continue;
-      let entry;
-      try {
-        entry = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (entry.isSidechain) continue;
-      const content = entry.message && entry.message.content;
-      if (!Array.isArray(content)) continue;
+  const messages = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (entry.isSidechain) continue;
+    const content = entry.message && entry.message.content;
+
+    if (entry.type === "user" && typeof content === "string") {
+      const text = clean(content);
+      if (text) messages.push({ role: "user", text });
+      continue;
+    }
+    if (entry.type === "assistant" && Array.isArray(content)) {
+      const texts = [];
       for (const block of content) {
-        if (!block || block.type !== "tool_use") continue;
-        if (WORK_TOOLS.has(block.name)) didWork = true;
-        else if (
-          block.name === "Skill" &&
-          typeof (block.input && block.input.skill) === "string" &&
-          block.input.skill.includes(WORKLOG_SKILL)
-        ) {
-          didLog = true;
+        if (!block) continue;
+        if (block.type === "text" && block.text) texts.push(block.text);
+        else if (block.type === "tool_use") {
+          if (WORK_TOOLS.has(block.name)) didWork = true;
+          else if (
+            block.name === "Skill" &&
+            typeof (block.input && block.input.skill) === "string" &&
+            block.input.skill.includes(WORKLOG_SKILL)
+          ) {
+            didLog = true;
+          }
         }
       }
+      const text = clean(texts.join("\n"));
+      if (text) messages.push({ role: "assistant", text });
     }
-  } catch {
-    /* unreadable — treat as nothing to log */
   }
-  return { didWork, didLog };
-}
-
-/**
- * Pull human asks + assistant replies out of the transcript JSONL, dropping
- * thinking, tool calls, attachments, and sidechain (subagent) entries.
- */
-function readTranscript(transcriptPath) {
-  const messages = [];
-  try {
-    for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
-      if (!line.trim()) continue;
-      let entry;
-      try {
-        entry = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (entry.isSidechain) continue;
-      const content = entry.message && entry.message.content;
-      if (entry.type === "user" && typeof content === "string") {
-        const text = clean(content);
-        if (text) messages.push({ role: "user", text });
-      } else if (entry.type === "assistant" && Array.isArray(content)) {
-        const text = clean(
-          content
-            .filter((b) => b.type === "text")
-            .map((b) => b.text)
-            .join("\n"),
-        );
-        if (text) messages.push({ role: "assistant", text });
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return messages;
+  return { didWork, didLog, messages };
 }
 
 // Strip command-wrapper / system tags and collapse whitespace.
@@ -196,7 +195,7 @@ function buildDigest(messages) {
 }
 
 /**
- * Summarize the session tail into one line on the cheapest model. Returns "" on
+ * Summarize the new-work slice into one line on the cheapest model. Returns "" on
  * trivial work (model replies NONE) or any failure (offline / not installed).
  *
  *   --strict-mcp-config        no MCP servers (fast, no auth prompts)
@@ -259,20 +258,18 @@ function appendEntry(summary, project) {
   }
 }
 
-function alreadyLogged(sessionId) {
+function readProgress() {
   try {
-    if (!fs.existsSync(LOGGED_FILE)) return false;
-    return fs.readFileSync(LOGGED_FILE, "utf8").split("\n").includes(sessionId);
+    return JSON.parse(fs.readFileSync(PROGRESS_FILE, "utf8")) || {};
   } catch {
-    return false;
+    return {}; // missing or corrupt — start fresh
   }
 }
 
-function markLogged(sessionId) {
-  if (!sessionId) return;
+function writeProgress(progress) {
   try {
     fs.mkdirSync(WORKLOG_DIR, { recursive: true });
-    fs.appendFileSync(LOGGED_FILE, `${sessionId}\n`);
+    fs.writeFileSync(PROGRESS_FILE, JSON.stringify(progress));
   } catch {
     /* best-effort */
   }
