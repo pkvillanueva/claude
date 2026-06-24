@@ -33,9 +33,19 @@ const NUDGED_FILE = path.join(WORKLOG_DIR, ".nudged-sessions");
 // Tool calls that signal real work landed and may be worth logging.
 const WORK_TOOLS = new Set(["Edit", "Write", "NotebookEdit"]);
 
-// Substring that appears in the transcript when work-log was invoked, so we
-// never nudge for a session that already logged.
-const WORKLOG_MARKER = "pkvillanueva:work-log";
+// Substring identifying the work-log skill. Only meaningful inside a `Skill`
+// tool_use's input — NOT as a bare transcript substring: the skill's name is
+// injected into every session's context as an available skill (a system-reminder
+// "attachment"), so a plain `line.includes()` is true even when nothing was
+// logged, which would suppress every nudge. Match the actual invocation only.
+const WORKLOG_SKILL = "work-log";
+
+// True only for a real `Skill` tool_use that invoked work-log.
+function isWorklogInvocation(block) {
+  if (!block || block.type !== "tool_use" || block.name !== "Skill") return false;
+  const skill = block.input && block.input.skill;
+  return typeof skill === "string" && skill.includes(WORKLOG_SKILL);
+}
 
 const NUDGE =
   "Substantive edits landed this session but the work-log skill has not recorded " +
@@ -101,9 +111,8 @@ function scanTranscript(transcriptPath) {
   try {
     const lines = fs.readFileSync(transcriptPath, "utf8").split("\n");
     for (const line of lines) {
+      if (didWork && didLog) break; // both known — stop scanning
       if (!line.trim()) continue;
-      if (!didLog && line.includes(WORKLOG_MARKER)) didLog = true;
-      if (didWork) continue; // already know work happened; only still hunting didLog
       let entry;
       try {
         entry = JSON.parse(line);
@@ -114,10 +123,9 @@ function scanTranscript(transcriptPath) {
       const content = entry.message && entry.message.content;
       if (!Array.isArray(content)) continue;
       for (const block of content) {
-        if (block && block.type === "tool_use" && WORK_TOOLS.has(block.name)) {
-          didWork = true;
-          break;
-        }
+        if (!block || block.type !== "tool_use") continue;
+        if (WORK_TOOLS.has(block.name)) didWork = true;
+        else if (isWorklogInvocation(block)) didLog = true;
       }
     }
   } catch {
