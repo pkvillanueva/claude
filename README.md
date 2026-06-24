@@ -8,9 +8,8 @@ skills, agents, hooks, and slash commands.
 
 | Component      | What                                                                |
 | -------------- | ------------------------------------------------------------------- |
-| `skills/`      | `coding-standards` skill + `worklog` skill (query your work log)     |
-| `hooks/`       | `worklog` SessionEnd hook — auto-logs a summary of each session      |
-| `scripts/`     | `query.js` — reads the work log back for the `worklog` skill         |
+| `skills/`      | `coding-standards`, `work-log` (write), `work-history` (query) skills |
+| `scripts/`     | `query.js` — reads the work log back for the `work-history` skill    |
 | `dependencies` | Auto-installs caveman + superpowers + more when this plugin installs |
 
 ### coding-standards references
@@ -35,25 +34,27 @@ Attribution + sources: [skills/coding-standards/references/CREDITS.md](skills/co
 
 ## Work log
 
-A `SessionEnd` hook (`hooks/worklog.js`) records what you did each session, and a
-`worklog` skill reads it back on demand.
+Two model-invoked skills, no hook: `work-log` writes the log, `work-history`
+reads it back.
 
-- **Capture:** when a session ends, the hook summarizes it with a cheap, isolated
-  headless `claude -p` call and appends one timestamped line to
-  `~/.claude/work-log/<YYYY-MM-DD>.md`, tagged with the project. Trivial sessions
-  are skipped; failures fall back to logging the last request. It always exits
-  cleanly and never blocks you from quitting.
+- **Write:** automated and agent-decided — after finishing a substantive unit of
+  work, Claude self-invokes the `work-log` skill, judges whether it's worth
+  recording, and (if so) appends one timestamped past-tense line to
+  `~/.claude/work-log/<YYYY-MM-DD>.md`, tagged with the project. Not a user
+  command; trivial lookups and questions are skipped. Claude writes the line
+  directly — no headless call, no background hook.
 - **Query:** ask *"what did I do today / this week / this past month"* (optionally
-  on a project) and the `worklog` skill runs `scripts/query.js` and narrates it.
+  on a project) and the `work-history` skill runs `scripts/query.js` and narrates
+  it.
 
 ```md
 # Work Log — 2026-06-24
 
-- **16:42** — Built the worklog hook and verified it fires _(project: claude)_
+- **16:42** — Split the work log into write + query skills _(project: claude)_
 ```
 
 Logs live in `~/.claude/work-log/` (global, across all projects) and are not
-committed. Needs Node and the `claude` CLI on `PATH`.
+committed. Query needs Node on `PATH`.
 
 ## Bundled plugins (one install, everything)
 

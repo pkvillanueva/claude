@@ -2,9 +2,9 @@
 "use strict";
 
 /**
- * Read back the work log written by the SessionEnd hook. Prints the dated
+ * Read back the work log written by the work-log skill. Prints the dated
  * entries that fall in a time window, optionally filtered to one project.
- * Read-only; no LLM. The worklog skill runs this and narrates the result.
+ * Read-only; no LLM. The work-history skill runs this and narrates the result.
  *
  * Usage:
  *   node query.js --today

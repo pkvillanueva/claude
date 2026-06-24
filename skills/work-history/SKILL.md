@@ -1,13 +1,14 @@
 ---
-name: worklog
-description: Use when the user asks what they have done/worked on/accomplished over a time window — "what did I do today", "what have I worked on this week", "summarize my past month", "what did I get done yesterday", optionally scoped to a project. Reads the local work log written automatically at the end of each Claude Code session.
+name: work-history
+description: Use when the user asks what they have done/worked on/accomplished over a time window — "what did I do today", "what have I worked on this week", "summarize my past month", "what did I get done yesterday", optionally scoped to a project. Reads the local work log.
 ---
 
-# Work Log Query
+# Work History
 
-Answer "what did I do?" questions by reading the work log that the SessionEnd hook
-writes to `~/.claude/work-log/<YYYY-MM-DD>.md`. Do **not** reconstruct work from
-git history or memory — read the log via the query script.
+Answer "what did I do?" questions by reading the work log at
+`~/.claude/work-log/<YYYY-MM-DD>.md` — the log written by the **work-log** skill.
+Do **not** reconstruct work from git history or memory — read the log via the
+query script.
 
 ## How to answer
 
@@ -37,8 +38,6 @@ git history or memory — read the log via the query script.
 
 ## Notes
 
-- Each log entry is one ended session, tagged with its project.
-- Entries marked `[unsummarized]` are sessions logged while the summarizer was
-  offline — present them as-is.
+- Each log entry is one logged session, tagged with its project.
 - If the script prints "No work-log entries found", tell the user plainly; don't
   invent activity.
