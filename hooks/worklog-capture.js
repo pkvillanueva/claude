@@ -91,17 +91,21 @@ function main() {
 
   const { didWork, didLog, messages } = scanSlice(text.slice(seen).split("\n"));
 
-  let summary = "";
+  // summarize() returns a line, "" for trivial (model said NONE), or null when the
+  // summarizer couldn't run (binary missing / error / timeout).
+  let summary = null;
   if (didWork && !didLog) {
     const digest = buildDigest(messages);
     if (digest.length >= MIN_DIGEST_CHARS) summary = summarize(digest);
   }
   if (summary) appendEntry(summary, project);
 
-  // Advance the pointer past everything we just examined — whether or not we
-  // logged — so this slice is never reconsidered. (If the summarizer was offline,
-  // the slice's work is skipped; that's an acceptable miss for a best-effort net.)
-  if (sessionId) {
+  // Advance the pointer past everything we examined so it's never reconsidered —
+  // UNLESS the summarizer failed to run (summary === null with work present). In
+  // that case keep the pointer so the work is retried on a later turn rather than
+  // silently lost. A trivial NONE ("") still advances.
+  const execFailed = summary === null && didWork && !didLog;
+  if (sessionId && !execFailed) {
     progress[sessionId] = text.length;
     writeProgress(progress);
   }
@@ -198,8 +202,33 @@ function buildDigest(messages) {
 }
 
 /**
- * Summarize the new-work slice into one line on the cheapest model. Returns "" on
- * trivial work (model replies NONE) or any failure (offline / not installed).
+ * Resolve the `claude` binary. A Stop-hook subprocess can get a minimal PATH that
+ * omits ~/.local/bin (the default install location), so `claude` alone may not
+ * resolve. Check known locations explicitly before falling back to PATH.
+ */
+function findClaude() {
+  const candidates = [
+    process.env.CLAUDE_WORKLOG_BIN,
+    path.join(os.homedir(), ".local", "bin", "claude"),
+    "/opt/homebrew/bin/claude",
+    "/usr/local/bin/claude",
+    "/usr/bin/claude",
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch {
+      /* keep looking */
+    }
+  }
+  return "claude"; // last resort: rely on PATH
+}
+
+/**
+ * Summarize the new-work slice into one line on the cheapest model. Returns the
+ * line, "" for trivial work (model replies NONE / empty), or null when the
+ * summarizer couldn't run (binary missing / error / timeout) — the caller keeps
+ * the transcript pointer in the null case so the work is retried, not lost.
  *
  *   --strict-mcp-config        no MCP servers (fast, no auth prompts)
  *   --no-session-persistence   no throwaway session files
@@ -210,7 +239,7 @@ function summarize(digest) {
   let out;
   try {
     out = execFileSync(
-      "claude",
+      findClaude(),
       [
         "-p",
         "--strict-mcp-config",
@@ -231,7 +260,7 @@ function summarize(digest) {
       },
     );
   } catch {
-    return "";
+    return null; // binary missing / error / timeout — signal "couldn't run"
   }
   const oneLine = toOneLine((out || "").trim());
   if (!oneLine || /^none\b/i.test(oneLine)) return "";
