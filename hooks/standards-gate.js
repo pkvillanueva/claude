@@ -19,7 +19,7 @@
  * the single source of truth — this hook only forces its load, never duplicates
  * its content.
  *
- * Scope: only code/.md files (extension check below). Non-code edits pass
+ * Scope: only code files (extension check below). Non-code edits pass
  * through untouched.
  *
  * Best-effort: this MUST NOT break a session. Every path exits 0; a thrown
@@ -31,7 +31,7 @@ const os = require("os");
 const path = require("path");
 
 // File kinds the coding-standards skill governs. Anything else passes silently.
-const GUARDED = /\.(ts|tsx|js|jsx|mjs|cjs|md|mdx)$/i;
+const GUARDED = /\.(ts|tsx|js|jsx|mjs|cjs)$/i;
 const SKILL = "coding-standards";
 
 function readStdin() {

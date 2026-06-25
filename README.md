@@ -29,7 +29,6 @@ in-repo, no upstream sync.
 | `react-native.md` | RN/Expo                                                             |
 | `nextjs.md`       | App Router basics + RSC boundaries, OG images, runtime, self-host  |
 | `web-design.md`   | UX / a11y review checklist                                          |
-| `markdown.md`     | aligned table formatting                                            |
 
 Attribution + sources: [skills/coding-standards/references/CREDITS.md](skills/coding-standards/references/CREDITS.md).
 
@@ -100,8 +99,8 @@ To add another plugin to the bundle later: list its real source in
 ## How the coding-standards skill works
 
 `skills/coding-standards/` is a model-invoked skill. Claude reads its
-description and invokes it when you write or edit TypeScript, React, Next.js, or
-Markdown files, then loads only the relevant reference:
+description and invokes it when you write or edit TypeScript, React, or Next.js
+files, then loads only the relevant reference:
 
 ```
 skills/coding-standards/
@@ -113,7 +112,6 @@ skills/coding-standards/
     react-native.md    # RN/Expo
     nextjs.md          # App Router basics + RSC boundaries, OG images, runtime, self-host
     web-design.md      # UX / a11y review checklist
-    markdown.md        # aligned table formatting
     CREDITS.md         # attribution for distilled material
 ```
 
