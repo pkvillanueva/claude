@@ -91,6 +91,14 @@
         "url": "https://github.com/pbakaus/impeccable.git"
       },
       "description": "Design fluency for frontend dev. 1 skill, 23 commands (/impeccable polish, audit, critique). Anti-pattern detection."
+    },
+    {
+      "name": "sunoku",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/starsynk/sunoku.git"
+      },
+      "description": "Plugin from starsynk/sunoku."
     }
   ]
 }
