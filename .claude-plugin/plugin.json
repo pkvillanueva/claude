@@ -1,7 +1,7 @@
 {
   "name": "pkvillanueva",
   "description": "Patrick's personal Claude Code setup. Ships a coding-standards skill (TypeScript, React, Next.js) plus work-log and work-history skills that write and query a daily work log. Home for future skills, agents, hooks, and commands.",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "author": {
     "name": "Patrick Villanueva",
     "email": "pkrvillanueva@gmail.com"
@@ -15,6 +15,7 @@
     "neon",
     "supabase",
     "playwright",
-    "impeccable"
+    "impeccable",
+    "sunoku"
   ]
 }
